@@ -86,10 +86,7 @@ public class PremiumPaymentService {
     @Transactional
     public PremiumPaymentResponse pay(Long customerId, String policyNumber, PremiumPaymentRequest request) {
         CustomerPolicy policy = findPolicy(customerId, policyNumber);
-        if (POLICY_STATUS_FULLY_PAID.equals(policy.getStatus())) {
-            throw new DuplicatePaymentException(
-                    "All premium installments for policy " + policy.getPolicyNumber() + " have already been paid.");
-        }
+        
         Set<Long> selected = new HashSet<>();
         request.payments().forEach(payment -> {
             if (!selected.add(payment.installmentId())) {
@@ -98,6 +95,18 @@ public class PremiumPaymentService {
         });
 
         List<PremiumInstallment> installments = installmentRepository.findByPolicyIdForUpdate(policy.getId());
+        boolean allInstallmentsPaid = !installments.isEmpty()
+        && installments.stream()
+                .allMatch(installment ->
+                        InstallmentStatus.PAID.name()
+                                .equals(installment.getPaymentStatus()));
+
+        if (allInstallmentsPaid) {
+        throw new DuplicatePaymentException(
+                "All premium installments for policy "
+                        + policy.getPolicyNumber()
+                        + " have already been paid.");
+        }
         Map<Long, PremiumInstallment> installmentsById = installments.stream()
                 .collect(Collectors.toMap(PremiumInstallment::getId, Function.identity()));
         Map<Long, BigDecimal> penalties = penaltiesByInstallment(paymentRepository.findAllByPolicyId(policy.getId()));
