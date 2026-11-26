@@ -66,7 +66,11 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request);
     }
 
-    @ExceptionHandler({ DuplicatePolicyException.class, DuplicatePaymentException.class })
+    @ExceptionHandler({
+            DuplicatePolicyException.class,
+            DuplicatePaymentException.class,
+            DuplicateCustomerException.class
+    })
     public ResponseEntity<ErrorResponse> handleDuplicatePolicy(RuntimeException ex,
             HttpServletRequest request) {
         return error(HttpStatus.CONFLICT, ex.getMessage(), request);
@@ -128,3 +132,4 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(Instant.now(clock), status, message, request.getRequestURI()));
     }
 }
+

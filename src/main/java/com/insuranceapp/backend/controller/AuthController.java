@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.insuranceapp.backend.dto.LoginRequest;
 import com.insuranceapp.backend.dto.LoginResponse;
+import com.insuranceapp.backend.dto.RegisterRequest;
+import com.insuranceapp.backend.dto.RegisterResponse;
 import com.insuranceapp.backend.service.AuthService;
 
 import jakarta.validation.Valid;
@@ -14,6 +16,7 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+
     private final AuthService authService;
 
     public AuthController(AuthService authService) {
@@ -21,7 +24,16 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public LoginResponse login(@Valid @RequestBody LoginRequest request) {
+    public LoginResponse login(
+            @Valid @RequestBody LoginRequest request) {
+
         return authService.login(request);
+    }
+
+    @PostMapping("/register")
+    public RegisterResponse register(
+            @Valid @RequestBody RegisterRequest request) {
+
+        return authService.register(request);
     }
 }

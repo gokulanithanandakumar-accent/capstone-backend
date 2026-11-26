@@ -11,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import com.insuranceapp.backend.dto.RegisterResponse;
+import com.insuranceapp.backend.exception.DuplicateCustomerException;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -123,5 +125,82 @@ class AuthControllerTest {
                 .header("Origin", "http://evil.example.com")
                 .header("Access-Control-Request-Method", "POST"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void registrationIsPublicAndReturnsCreatedCustomer() throws Exception {
+
+        when(authService.register(any()))
+                .thenReturn(
+                        new RegisterResponse(
+                                1005L,
+                                "Gokul",
+                                "gokul@example.com",
+                                "Registration successful. You can now sign in."));
+
+        mockMvc.perform(
+                post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fullName": "Gokul",
+                                  "email": "gokul@example.com",
+                                  "dateOfBirth": "1998-04-15",
+                                  "phone": "9876543210",
+                                  "password": "Password@123"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.customerId").value(1005))
+                .andExpect(jsonPath("$.fullName").value("Gokul"))
+                .andExpect(jsonPath("$.email").value("gokul@example.com"))
+                .andExpect(jsonPath("$.message")
+                        .value("Registration successful. You can now sign in."));
+    }
+
+    @Test
+    void registrationReturnsConflictForDuplicateEmail() throws Exception {
+
+        when(authService.register(any()))
+                .thenThrow(
+                        new DuplicateCustomerException(
+                                "An account already exists with this email address."));
+
+        mockMvc.perform(
+                post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fullName": "Gokul",
+                                  "email": "gokul@example.com",
+                                  "dateOfBirth": "1998-04-15",
+                                  "phone": "9876543210",
+                                  "password": "Password@123"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("An account already exists with this email address."));
+    }
+
+    @Test
+    void registrationValidatesRequiredFields() throws Exception {
+
+        mockMvc.perform(
+                post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fullName": "",
+                                  "email": "bad-email",
+                                  "dateOfBirth": null,
+                                  "password": "short"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.fullName").exists())
+                .andExpect(jsonPath("$.fieldErrors.email").exists())
+                .andExpect(jsonPath("$.fieldErrors.dateOfBirth").exists())
+                .andExpect(jsonPath("$.fieldErrors.password").exists());
     }
 }
