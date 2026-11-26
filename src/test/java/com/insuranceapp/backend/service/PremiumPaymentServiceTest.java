@@ -194,13 +194,51 @@ class PremiumPaymentServiceTest {
     }
 
     @Test
-    void rejectsPaymentOnFullyPaidPolicy() {
-        policy.setStatus("FULLY_PAID");
+void allowsPaymentWhenPolicyStatusIsStaleFullyPaidButInstallmentIsUnpaid() {
+    policy.setStatus("FULLY_PAID");
 
-        assertThatThrownBy(() -> service.pay(CUSTOMER_ID, POLICY_NUMBER, new PremiumPaymentRequest(
-                PaymentMethod.UPI, List.of(new InstallmentPayment(4003L, new BigDecimal("1.00"))))))
-                .isInstanceOf(DuplicatePaymentException.class);
-    }
+    PremiumPaymentResponse response = service.pay(
+            CUSTOMER_ID,
+            POLICY_NUMBER,
+            new PremiumPaymentRequest(
+                    PaymentMethod.UPI,
+                    List.of(new InstallmentPayment(
+                            4003L,
+                            new BigDecimal("1.00")))));
+
+    assertThat(response.receipts()).hasSize(1);
+    assertThat(third.getPaidAmount()).isEqualByComparingTo("1.00");
+    assertThat(third.getPaymentStatus()).isEqualTo("PARTIALLY_PAID");
+
+    verify(paymentRepository).saveAll(anyList());
+}
+
+@Test
+void rejectsPaymentWhenAllActualInstallmentsAreAlreadyPaid() {
+    second.setPaidAmount(new BigDecimal("1250.00"));
+    second.setPaymentStatus("PAID");
+
+    third.setPaidAmount(new BigDecimal("1250.00"));
+    third.setPaymentStatus("PAID");
+
+    policy.setStatus("FULLY_PAID");
+
+    assertThatThrownBy(() -> service.pay(
+            CUSTOMER_ID,
+            POLICY_NUMBER,
+            new PremiumPaymentRequest(
+                    PaymentMethod.UPI,
+                    List.of(new InstallmentPayment(
+                            4003L,
+                            new BigDecimal("1.00"))))))
+            .isInstanceOf(DuplicatePaymentException.class)
+            .hasMessage(
+                    "All premium installments for policy "
+                            + POLICY_NUMBER
+                            + " have already been paid.");
+
+    verify(paymentRepository, never()).saveAll(anyList());
+}
 
     @Test
     void rejectsPaymentExceedingOutstandingAmount() {
